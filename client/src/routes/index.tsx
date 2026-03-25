@@ -81,7 +81,7 @@ function LandingPage() {
         <div className="flex flex-wrap gap-3">
           <Link
             to="/upload"
-            className="rounded-full bg-(--lagoon-deep) px-6 py-2.5 text-sm font-semibold text-white! no-underline transition hover:-translate-y-0.5 hover:opacity-90"
+            className="rounded-full bg-(--lagoon-deep) px-6 py-2.5 text-sm font-semibold text-white! no-underline dark:bg-(--lagoon) transition hover:-translate-y-0.5 hover:opacity-90"
           >
             Upload a CSV →
           </Link>

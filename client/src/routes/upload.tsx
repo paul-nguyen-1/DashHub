@@ -106,7 +106,7 @@ function DropZone({
       onDragOver={(e) => e.preventDefault()}
       onDrop={onDrop}
       className={[
-        'relative flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-8 py-12 text-center transition-all duration-200',
+        'relative flex cursor-pointer flex-col dark:bg-(--bg-modal)  items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-8 py-12 text-center transition-all duration-200',
         isDragging
           ? 'border-(--lagoon-deep) bg-[rgba(37,99,235,0.06)] scale-[1.01]'
           : 'border-[rgba(23,58,64,0.2)] bg-white/60 hover:border-[rgba(37,99,235,0.4)] hover:bg-[rgba(37,99,235,0.03)]',
@@ -168,7 +168,7 @@ function SampleFileCard({
         'flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left transition hover:-translate-y-0.5',
         selected
           ? 'border-(--lagoon-deep) bg-[rgba(37,99,235,0.06)]'
-          : 'border-[rgba(23,58,64,0.14)] bg-white/70 hover:border-[rgba(37,99,235,0.35)]',
+          : 'border-[rgba(23,58,64,0.14)] bg-(--bg-base) hover:border-[rgba(37,99,235,0.35)]',
       ].join(' ')}
     >
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[rgba(23,58,64,0.06)] text-lg">
@@ -370,7 +370,7 @@ function UploadPage() {
               'w-full rounded-2xl py-3.5 text-sm font-semibold transition',
               hasSelection && !isProcessing
                 ? 'bg-(--lagoon-deep) text-white hover:opacity-90 hover:-translate-y-0.5'
-                : 'cursor-not-allowed bg-[rgba(23,58,64,0.07)] text-(--sea-ink-soft)',
+                : 'cursor-not-allowed bg-[rgba(118,118,118,0.2)] text-(--sea-ink-soft)',
             ].join(' ')}
           >
             {isProcessing

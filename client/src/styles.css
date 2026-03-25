@@ -36,6 +36,7 @@
   --palm: #6ec89a;
   --sand: #0f1a1e;
   --foam: #101d22;
+  --bg-modal: #1a2626;
   --surface: rgba(16, 30, 34, 0.8);
   --surface-strong: rgba(15, 27, 31, 0.92);
   --line: rgba(141, 229, 219, 0.18);
@@ -59,6 +60,7 @@
     --palm: #6ec89a;
     --sand: #0f1a1e;
     --foam: #101d22;
+    --bg-modal: #1a2626;
     --surface: rgba(16, 30, 34, 0.8);
     --surface-strong: rgba(15, 27, 31, 0.92);
     --line: rgba(141, 229, 219, 0.18);
