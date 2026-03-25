@@ -167,7 +167,7 @@ function LandingPage() {
             </ul>
           </div>
           <Link
-            to="/"
+            to="/upload"
             className="shrink-0 rounded-full border border-[rgba(50,143,151,0.3)] bg-[rgba(79,184,178,0.14)] px-5 py-2.5 text-sm font-semibold text-(--lagoon-deep) no-underline transition hover:-translate-y-0.5 hover:bg-[rgba(79,184,178,0.24)]"
           >
             Explore sample data →
