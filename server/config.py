@@ -8,8 +8,4 @@ class Settings(BaseSettings):
     allowed_origins: list[str] = ["http://localhost:3000"]
     max_upload_size_mb: int = 50
 
-    # AI — optional until Step 5
-    openai_api_key: str = ""
-
-
 settings = Settings()

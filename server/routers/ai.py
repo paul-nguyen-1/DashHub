@@ -5,14 +5,13 @@ from fastapi import APIRouter, HTTPException
 from openai import OpenAI
 from pydantic import BaseModel
 
-from config import settings
-
 router = APIRouter(prefix="/ai", tags=["ai"])
 
 UPLOADS_DIR = Path(__file__).parent.parent / "uploads"
 
+# Reads OPENAI_API_KEY from environment automatically
 # Swap this client for Anthropic when ready
-client = OpenAI(api_key=settings.openai_api_key)
+client = OpenAI()
 MODEL = "gpt-4o-mini"
 
 
