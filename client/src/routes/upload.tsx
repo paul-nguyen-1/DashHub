@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useState, useRef, useCallback } from 'react'
+import { api } from '@/lib/api'
 
 export const Route = createFileRoute('/upload')({ component: UploadPage })
 
@@ -302,23 +303,21 @@ function UploadPage() {
   }
 
   const handleContinue = async () => {
-    if (!selectedFile) {
-      return
-    }
+    if (!selectedFile) return
     setIsProcessing(true)
-    // In production: upload the file, get back a job ID, navigate to /process/:id
-    // For now we navigate straight to the processing screen
-    await new Promise((r) => setTimeout(r, 400)) // simulate hand-off
-    // in handleContinue
-    navigate({
-      to: '/process',
-      search: {
-        file:
-          selectedFile instanceof File
-            ? selectedFile.name
-            : (selectedFile as SampleFile).filename,
-      },
-    })
+    setError(null)
+
+    try {
+      if (selectedFile instanceof File) {
+        const { file_id, filename } = await api.upload(selectedFile)
+        navigate({ to: '/process', search: { file: filename, file_id } })
+      } else {
+        navigate({ to: '/process', search: { file: (selectedFile as SampleFile).filename, file_id: undefined } })
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed')
+      setIsProcessing(false)
+    }
   }
 
   const hasSelection = selectedFile !== null

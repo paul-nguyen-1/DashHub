@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useState, useRef, useEffect } from 'react'
+import { api, type ChatMessage } from '@/lib/api'
 import {
   BarChart,
   Bar,
@@ -14,7 +15,13 @@ import {
   ReferenceLine,
 } from 'recharts'
 
-export const Route = createFileRoute('/report')({ component: ReportPage })
+export const Route = createFileRoute('/report')({
+  validateSearch: (s: Record<string, unknown>) => ({
+    file_id: s.file_id ? String(s.file_id) : undefined,
+    file: s.file ? String(s.file) : undefined,
+  }),
+  component: ReportPage,
+})
 
 interface Message {
   role: 'user' | 'ai'
@@ -65,18 +72,6 @@ const ZERO_REPS = [
   },
 ]
 
-const AI_RESPONSES: Record<string, string> = {
-  'why did it drop?':
-    'Three North reps logged zero sales after Sep 15 — J. Smith, R. Patel, and M. Lee. Their combined shortfall is ~$81K, which accounts for 91% of the September decline. This is too concentrated to be a market issue.',
-  'is it a data issue?':
-    "Possibly. The pattern is unusually clean — all three reps go dark on the same week in the same region. If deals were entered into a separate CRM system after Sep 15, those rows wouldn't appear in your CSV. I'd cross-reference before taking action.",
-  'what should we do?':
-    "1. Verify whether J. Smith, R. Patel, and M. Lee are still active — check your CRM or HR system. 2. If they're gone, redistribute the North region pipeline immediately. 3. Upload October's CSV as soon as it's available so I can confirm whether the dip is ongoing.",
-  'how do i share this report?':
-    'Click "Export PDF" in the top right to download a formatted version. You can also copy the report URL and share it directly — anyone with access to DashHub can view it.',
-  'upload october data':
-    "Go to the Upload page and drop October's CSV. I'll automatically merge it with the Q3 data and update this report and all your dashboard charts. The anomaly section will update based on whether the North region recovered.",
-}
 
 function ChartTooltip({
   active,
@@ -134,7 +129,7 @@ function RepZeroCard({ rep }: { rep: (typeof ZERO_REPS)[number] }) {
   )
 }
 
-function AiChatPanel() {
+function AiChatPanel({ fileId }: { fileId?: string }) {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'ai',
@@ -142,6 +137,7 @@ function AiChatPanel() {
         'I generated this report from your CSV. Ask me anything about the findings.',
     },
   ])
+  const [history, setHistory] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [thinking, setThinking] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -151,24 +147,41 @@ function AiChatPanel() {
   }, [messages, thinking])
 
   const QUICK = [
-    'Why did it drop?',
-    'Is it a data issue?',
-    'What should we do?',
-    'Upload October data',
+    'Why did revenue drop?',
+    'Which region performed best?',
+    'What are the top recommendations?',
+    'Summarize key findings',
   ]
 
   const handleSend = async (text = input.trim()) => {
     if (!text) return
+    const userMsg: ChatMessage = { role: 'user', content: text }
     setMessages((prev) => [...prev, { role: 'user', content: text }])
     setInput('')
     setThinking(true)
-    await new Promise((r) => setTimeout(r, 800))
-    setThinking(false)
-    const key = text.toLowerCase()
-    const answer =
-      AI_RESPONSES[key] ??
-      `That's a good angle. Based on the CSV data, I'd focus on the Sep 15 cutoff and the North region concentration. Want me to add this to the report as an additional finding?`
-    setMessages((prev) => [...prev, { role: 'ai', content: answer }])
+
+    try {
+      if (fileId) {
+        const nextHistory = [...history, userMsg]
+        const { reply } = await api.chat(fileId, nextHistory)
+        const assistantMsg: ChatMessage = { role: 'assistant', content: reply }
+        setHistory([...nextHistory, assistantMsg])
+        setMessages((prev) => [...prev, { role: 'ai', content: reply }])
+      } else {
+        await new Promise((r) => setTimeout(r, 800))
+        setMessages((prev) => [
+          ...prev,
+          { role: 'ai', content: 'No file loaded — upload a CSV to get AI answers.' },
+        ])
+      }
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        { role: 'ai', content: 'Something went wrong. Please try again.' },
+      ])
+    } finally {
+      setThinking(false)
+    }
   }
 
   return (
@@ -248,7 +261,18 @@ function AiChatPanel() {
 }
 
 function ReportPage() {
+  const { file_id, file } = Route.useSearch()
   const [exported, setExported] = useState(false)
+  const [reportText, setReportText] = useState<string | null>(null)
+  const [reportLoading, setReportLoading] = useState(false)
+
+  useEffect(() => {
+    if (!file_id) return
+    setReportLoading(true)
+    api.generateReport(file_id)
+      .then(({ report }) => setReportText(report))
+      .finally(() => setReportLoading(false))
+  }, [file_id])
 
   const handleExport = () => {
     setExported(true)
@@ -313,7 +337,7 @@ function ReportPage() {
             <div className="mb-6">
               <div className="mb-2 flex flex-wrap items-center gap-2">
                 <span className="rounded-full border border-[rgba(23,58,64,0.12)] bg-white px-2.5 py-1 text-xs text-(--sea-ink-soft)">
-                  Sales_Q3_2025.csv
+                  {file ?? 'Uploaded file'}
                 </span>
                 <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
                   Dash AI
@@ -335,16 +359,26 @@ function ReportPage() {
 
             <section className="island-shell mb-5 rounded-2xl p-5">
               <SectionHeading>Executive summary</SectionHeading>
-              <p className="text-sm leading-relaxed text-(--sea-ink)">
-                Q3 revenue reached <strong>$1.24M</strong>, up 9.2% vs Q2,
-                driven by strong July and August performance. However, September
-                showed a <strong>46% revenue decline</strong> from August —
-                dropping from $141K to $63K. This decline was driven almost
-                entirely by the North region, where three sales reps logged zero
-                activity after September 15. The shortfall of approximately{' '}
-                <strong>$81K</strong> accounts for 91% of the month-over-month
-                drop.
-              </p>
+              {reportLoading ? (
+                <div className="flex items-center gap-2 text-sm text-(--sea-ink-soft)">
+                  <span className="animate-pulse">✦</span> Generating report…
+                </div>
+              ) : reportText ? (
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-(--sea-ink)">
+                  {reportText}
+                </p>
+              ) : (
+                <p className="text-sm leading-relaxed text-(--sea-ink)">
+                  Q3 revenue reached <strong>$1.24M</strong>, up 9.2% vs Q2,
+                  driven by strong July and August performance. However, September
+                  showed a <strong>46% revenue decline</strong> from August —
+                  dropping from $141K to $63K. This decline was driven almost
+                  entirely by the North region, where three sales reps logged zero
+                  activity after September 15. The shortfall of approximately{' '}
+                  <strong>$81K</strong> accounts for 91% of the month-over-month
+                  drop.
+                </p>
+              )}
             </section>
 
             <section className="island-shell mb-5 rounded-2xl p-5">
@@ -605,7 +639,7 @@ function ReportPage() {
           </div>
         </div>
 
-        <AiChatPanel />
+        <AiChatPanel fileId={file_id} />
       </div>
 
       <style>{`

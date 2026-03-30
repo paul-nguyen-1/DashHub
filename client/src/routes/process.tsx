@@ -1,9 +1,11 @@
 import { createFileRoute, useNavigate, Link } from '@tanstack/react-router'
 import { useState, useEffect, useCallback } from 'react'
+import { api, type Column } from '@/lib/api'
 
 export const Route = createFileRoute('/process')({
   validateSearch: (s: Record<string, unknown>) => ({
     file: String(s.file ?? ''),
+    file_id: s.file_id ? String(s.file_id) : undefined,
   }),
   component: ProcessPage,
 })
@@ -123,6 +125,34 @@ const INITIAL_COLUMNS: DetectedColumn[] = [
     nullable: true,
   },
 ]
+
+function assignDefaultRoles(cols: Column[]): DetectedColumn[] {
+  let hasTimeAxis = false
+  let hasPrimaryMetric = false
+  return cols.map((col) => {
+    let role: ColumnRole
+    if (col.type === 'date' && !hasTimeAxis) {
+      role = 'time_axis'
+      hasTimeAxis = true
+    } else if (col.type === 'number' && !hasPrimaryMetric) {
+      role = 'primary_metric'
+      hasPrimaryMetric = true
+    } else if (col.type === 'number') {
+      role = 'metric'
+    } else if (col.type === 'boolean') {
+      role = 'filter'
+    } else {
+      role = 'dimension'
+    }
+    return {
+      name: col.name,
+      type: col.type,
+      role,
+      samples: col.sample_values,
+      nullable: col.null_count > 0,
+    }
+  })
+}
 
 const INITIAL_STEPS: AnalysisStep[] = [
   { id: 1, label: 'File uploaded and parsed — 0 errors', status: 'done' },
@@ -363,10 +393,20 @@ function ColumnTable({
 
 function ProcessPage() {
   const navigate = useNavigate()
-  const { file } = Route.useSearch()
+  const { file, file_id } = Route.useSearch()
 
   const [columns, setColumns] = useState<DetectedColumn[]>(INITIAL_COLUMNS)
+  const [fileInfo, setFileInfo] = useState<{ rows: number; cols: number } | null>(null)
   const [analysisReady, setAnalysisReady] = useState(false)
+
+  // Fetch real columns when a file_id is available
+  useEffect(() => {
+    if (!file_id) return
+    api.process(file_id).then((res) => {
+      setColumns(assignDefaultRoles(res.columns))
+      setFileInfo({ rows: res.row_count, cols: res.column_count })
+    })
+  }, [file_id])
 
   const handleComplete = useCallback(() => {
     setAnalysisReady(true)
@@ -412,10 +452,12 @@ function ProcessPage() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-(--sea-ink)">
-                  Sales_Q3_2025.csv
+                  {file}
                 </p>
                 <p className="text-xs text-(--sea-ink-soft)">
-                  2,418 rows · 9 columns · 1.2 MB
+                  {fileInfo
+                    ? `${fileInfo.rows.toLocaleString()} rows · ${fileInfo.cols} columns`
+                    : 'Analyzing…'}
                 </p>
               </div>
               {analysisReady && (
