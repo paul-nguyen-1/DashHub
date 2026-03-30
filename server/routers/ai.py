@@ -33,9 +33,6 @@ def load_csv_summary(file_id: str) -> str:
     ]
     return "\n".join(lines)
 
-
-# --- Report ---
-
 @router.post("/report/{file_id}")
 def generate_report(file_id: str):
     summary = load_csv_summary(file_id)
@@ -58,10 +55,8 @@ def generate_report(file_id: str):
     return {"report": response.choices[0].message.content}
 
 
-# --- Chat / Q&A ---
-
 class ChatMessage(BaseModel):
-    role: str  # "user" or "assistant"
+    role: str
     content: str
 
 class ChatRequest(BaseModel):

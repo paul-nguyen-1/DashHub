@@ -9,36 +9,30 @@ router = APIRouter(prefix="/process", tags=["process"])
 
 
 def detect_column_type(series: pd.Series) -> str:
-    # Drop nulls for type detection
     sample = series.dropna()
     if sample.empty:
         return "text"
 
-    # Boolean
     unique = set(sample.astype(str).str.lower().unique())
     if unique <= {"true", "false", "yes", "no", "1", "0"}:
         return "boolean"
 
-    # Number (before date — avoids integers being parsed as dates)
     try:
         pd.to_numeric(sample)
         return "number"
     except Exception:
         pass
 
-    # Date
     try:
         pd.to_datetime(sample)
         return "date"
     except Exception:
         pass
-
     return "text"
 
 
 @router.get("/{file_id}")
 def process_file(file_id: str):
-    # Find the uploaded file
     matches = list(UPLOADS_DIR.glob(f"{file_id}.*"))
     if not matches:
         raise HTTPException(status_code=404, detail="File not found")
