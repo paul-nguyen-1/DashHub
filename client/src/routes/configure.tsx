@@ -4,6 +4,7 @@ import { useState } from 'react'
 export const Route = createFileRoute('/configure')({
   validateSearch: (s: Record<string, unknown>) => ({
     file: String(s.file ?? ''),
+    file_id: s.file_id ? String(s.file_id) : undefined,
   }),
   component: ConfigurePage,
 })
@@ -267,7 +268,7 @@ function AIFeatureToggle({
 
 function ConfigurePage() {
   const navigate = useNavigate()
-  const { file } = Route.useSearch()
+  const { file, file_id } = Route.useSearch()
 
   const [selectedTemplate, setSelectedTemplate] = useState('sales_performance')
   const [dateRange, setDateRange] = useState('all')
@@ -288,7 +289,7 @@ function ConfigurePage() {
     setIsBuilding(true)
     // In production: POST config to API, get dashboard ID back, navigate to /dashboard/:id
     await new Promise((r) => setTimeout(r, 500))
-    navigate({ to: '/dashboard' })
+    navigate({ to: '/dashboard', search: { file, file_id } })
   }
 
   return (
@@ -388,7 +389,7 @@ function ConfigurePage() {
               <p className="island-kicker">Column roles</p>
               <Link
                 to="/process"
-                search={{ file }}
+                search={{ file, file_id }}
                 className="text-xs text-(--lagoon-deep) no-underline hover:underline"
               >
                 ← Edit
@@ -452,7 +453,7 @@ function ConfigurePage() {
 
             <Link
               to="/process"
-              search={{ file }}
+              search={{ file, file_id }}
               className="block w-full rounded-2xl border border-[rgba(23,58,64,0.15)] py-3 text-center text-sm font-medium text-(--sea-ink-soft) no-underline transition hover:bg-[rgba(23,58,64,0.04)]"
             >
               ← Back to column setup

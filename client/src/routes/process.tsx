@@ -622,7 +622,7 @@ function ProcessPage() {
             <button
               type="button"
               disabled={!analysisReady}
-              onClick={() => navigate({ to: '/configure', search: { file } })}
+              onClick={() => navigate({ to: '/configure', search: { file, file_id } })}
               className={[
                 'w-full rounded-2xl py-3.5 text-sm font-semibold transition',
                 analysisReady

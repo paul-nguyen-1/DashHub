@@ -13,7 +13,13 @@ import {
   Cell,
 } from 'recharts'
 
-export const Route = createFileRoute('/dashboard')({ component: DashboardPage })
+export const Route = createFileRoute('/dashboard')({
+  validateSearch: (s: Record<string, unknown>) => ({
+    file: s.file ? String(s.file) : undefined,
+    file_id: s.file_id ? String(s.file_id) : undefined,
+  }),
+  component: DashboardPage,
+})
 
 interface Message {
   role: 'user' | 'ai'
@@ -400,17 +406,20 @@ function AiPanel({
 }
 
 function DashboardPage() {
+  const { file, file_id } = Route.useSearch()
   const [insights, setInsights] = useState<InsightCard[]>(INITIAL_INSIGHTS)
   const [regionFilter, setRegionFilter] = useState('All regions')
   const [dateFilter, setDateFilter] = useState('Jul–Sep 2025')
   const [showBanner, setShowBanner] = useState(true)
+
+  const reportSearch = { file, file_id }
 
   const dismissInsight = (id: string) =>
     setInsights((prev) => prev.filter((c) => c.id !== id))
 
   const handleInsightAction = (card: InsightCard) => {
     if (card.id === 'anomaly-sep') {
-      window.location.href = '/report'
+      window.location.href = `/report?file=${file ?? ''}&file_id=${file_id ?? ''}`
     }
   }
 
@@ -461,6 +470,7 @@ function DashboardPage() {
 
           <Link
             to="/report"
+            search={reportSearch}
             className="rounded-xl bg-(--lagoon-deep) px-3 py-1.5 text-xs font-semibold text-white! no-underline transition hover:opacity-90"
           >
             Generate report →
@@ -483,6 +493,7 @@ function DashboardPage() {
               <div className="flex shrink-0 items-center gap-2">
                 <Link
                   to="/report"
+            search={reportSearch}
                   className="rounded-xl bg-red-600 px-3 py-1.5 text-xs font-semibold text-white no-underline transition hover:bg-red-700"
                 >
                   Investigate →
