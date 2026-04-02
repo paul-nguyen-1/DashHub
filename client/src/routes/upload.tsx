@@ -12,51 +12,6 @@ interface SampleFile {
   filename: string
 }
 
-const SAMPLE_FILES: SampleFile[] = [
-  {
-    icon: '📊',
-    name: 'Sales Q3 2025',
-    rows: '2,418',
-    cols: '12',
-    filename: 'sales_q3_2025.csv',
-  },
-  {
-    icon: '👥',
-    name: 'HR Headcount',
-    rows: '582',
-    cols: '9',
-    filename: 'hr_headcount.csv',
-  },
-  {
-    icon: '📦',
-    name: 'Inventory',
-    rows: '1,104',
-    cols: '8',
-    filename: 'inventory.csv',
-  },
-  {
-    icon: '💰',
-    name: 'Finance Q3',
-    rows: '890',
-    cols: '11',
-    filename: 'finance_q3.csv',
-  },
-  {
-    icon: '🎯',
-    name: 'Marketing Leads',
-    rows: '3,201',
-    cols: '14',
-    filename: 'marketing_leads.csv',
-  },
-  {
-    icon: '🛠',
-    name: 'Support Tickets',
-    rows: '674',
-    cols: '10',
-    filename: 'support_tickets.csv',
-  },
-]
-
 const TIPS = [
   'A header row with clear column names (row 1)',
   'At least one date or time column',
@@ -107,7 +62,7 @@ function DropZone({
       onDragOver={(e) => e.preventDefault()}
       onDrop={onDrop}
       className={[
-        'relative flex cursor-pointer flex-col dark:bg-(--bg-modal)  items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-8 py-12 text-center transition-all duration-200',
+        'relative flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-8 py-12 text-center transition-all duration-200',
         isDragging
           ? 'border-(--lagoon-deep) bg-[rgba(37,99,235,0.06)] scale-[1.01]'
           : 'border-[rgba(23,58,64,0.2)] bg-white/60 hover:border-[rgba(37,99,235,0.4)] hover:bg-[rgba(37,99,235,0.03)]',
@@ -149,46 +104,6 @@ function DropZone({
         .csv · .tsv · .xlsx (first sheet) · max {MAX_MB} MB
       </span>
     </div>
-  )
-}
-
-function SampleFileCard({
-  file,
-  selected,
-  onSelect,
-}: {
-  file: SampleFile
-  selected: boolean
-  onSelect: (f: SampleFile) => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => onSelect(file)}
-      className={[
-        'flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left transition hover:-translate-y-0.5',
-        selected
-          ? 'border-(--lagoon-deep) bg-[rgba(37,99,235,0.06)]'
-          : 'border-[rgba(23,58,64,0.14)] bg-(--bg-base) hover:border-[rgba(37,99,235,0.35)]',
-      ].join(' ')}
-    >
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[rgba(23,58,64,0.06)] text-lg">
-        {file.icon}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-(--sea-ink)">
-          {file.name}
-        </p>
-        <p className="text-xs text-(--sea-ink-soft)">
-          {file.rows} rows · {file.cols} cols
-        </p>
-      </div>
-      {selected && (
-        <span className="shrink-0 text-xs font-semibold text-(--lagoon-deep)">
-          ✓
-        </span>
-      )}
-    </button>
   )
 }
 
@@ -259,7 +174,6 @@ function UploadPage() {
   const [selectedFile, setSelectedFile] = useState<File | SampleFile | null>(
     null,
   )
-  const [selectedSample, setSelectedSample] = useState<SampleFile | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
 
@@ -291,15 +205,7 @@ function UploadPage() {
       return
     }
     setError(null)
-    setSelectedSample(null)
     setSelectedFile(file)
-  }
-
-  const handleSampleSelected = (sample: SampleFile) => {
-    setError(null)
-    const isSame = selectedSample?.filename === sample.filename
-    setSelectedSample(isSame ? null : sample)
-    setSelectedFile(isSame ? null : sample)
   }
 
   const handleContinue = async () => {
@@ -312,7 +218,13 @@ function UploadPage() {
         const { file_id, filename } = await api.upload(selectedFile)
         navigate({ to: '/process', search: { file: filename, file_id } })
       } else {
-        navigate({ to: '/process', search: { file: (selectedFile as SampleFile).filename, file_id: undefined } })
+        navigate({
+          to: '/process',
+          search: {
+            file: (selectedFile as SampleFile).filename,
+            file_id: undefined,
+          },
+        })
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed')
@@ -327,7 +239,7 @@ function UploadPage() {
       <section className="island-shell rise-in relative overflow-hidden rounded-4xl px-6 py-10 sm:px-10 sm:py-12">
         <div className="pointer-events-none absolute -left-20 -top-20 h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(37,99,235,0.14),transparent_66%)]" />
 
-        <p className="island-kicker mb-3">Step 1 of 4</p>
+        <p className="island-kicker mb-3">Step 1 of 3</p>
         <h1 className="display-title mb-4 text-3xl font-bold leading-tight tracking-tight   text-(--sea-ink) sm:text-4xl">
           Import your data
         </h1>
@@ -356,7 +268,6 @@ function UploadPage() {
               file={selectedFile!}
               onRemove={() => {
                 setSelectedFile(null)
-                setSelectedSample(null)
               }}
             />
           )}
@@ -381,20 +292,6 @@ function UploadPage() {
         </div>
 
         <div className="flex flex-col gap-4">
-          <section className="island-shell rounded-2xl p-5">
-            <p className="island-kicker mb-4">Or try a sample dataset</p>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
-              {SAMPLE_FILES.map((f) => (
-                <SampleFileCard
-                  key={f.filename}
-                  file={f}
-                  selected={selectedSample?.filename === f.filename}
-                  onSelect={handleSampleSelected}
-                />
-              ))}
-            </div>
-          </section>
-
           <section className="island-shell rounded-2xl p-5">
             <p className="island-kicker mb-3">For best results</p>
             <ul className="space-y-2">

@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 load_dotenv()
 
 from config import settings
-from routers import ai, process, upload
+from routers import ai, dashboard, process, upload
 
 app = FastAPI(title="DashHub API", version="0.1.0")
 
@@ -19,6 +19,7 @@ app.add_middleware(
 
 app.include_router(upload.router)
 app.include_router(process.router)
+app.include_router(dashboard.router)
 app.include_router(ai.router)
 
 

@@ -13,7 +13,6 @@ import { Route as UploadRouteImport } from './routes/upload'
 import { Route as ReportRouteImport } from './routes/report'
 import { Route as ProcessRouteImport } from './routes/process'
 import { Route as DashboardRouteImport } from './routes/dashboard'
-import { Route as ConfigureRouteImport } from './routes/configure'
 import { Route as IndexRouteImport } from './routes/index'
 
 const UploadRoute = UploadRouteImport.update({
@@ -36,11 +35,6 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ConfigureRoute = ConfigureRouteImport.update({
-  id: '/configure',
-  path: '/configure',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -49,7 +43,6 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/configure': typeof ConfigureRoute
   '/dashboard': typeof DashboardRoute
   '/process': typeof ProcessRoute
   '/report': typeof ReportRoute
@@ -57,7 +50,6 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/configure': typeof ConfigureRoute
   '/dashboard': typeof DashboardRoute
   '/process': typeof ProcessRoute
   '/report': typeof ReportRoute
@@ -66,7 +58,6 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/configure': typeof ConfigureRoute
   '/dashboard': typeof DashboardRoute
   '/process': typeof ProcessRoute
   '/report': typeof ReportRoute
@@ -74,28 +65,14 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths:
-    | '/'
-    | '/configure'
-    | '/dashboard'
-    | '/process'
-    | '/report'
-    | '/upload'
+  fullPaths: '/' | '/dashboard' | '/process' | '/report' | '/upload'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/configure' | '/dashboard' | '/process' | '/report' | '/upload'
-  id:
-    | '__root__'
-    | '/'
-    | '/configure'
-    | '/dashboard'
-    | '/process'
-    | '/report'
-    | '/upload'
+  to: '/' | '/dashboard' | '/process' | '/report' | '/upload'
+  id: '__root__' | '/' | '/dashboard' | '/process' | '/report' | '/upload'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  ConfigureRoute: typeof ConfigureRoute
   DashboardRoute: typeof DashboardRoute
   ProcessRoute: typeof ProcessRoute
   ReportRoute: typeof ReportRoute
@@ -132,13 +109,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/configure': {
-      id: '/configure'
-      path: '/configure'
-      fullPath: '/configure'
-      preLoaderRoute: typeof ConfigureRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
@@ -151,7 +121,6 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  ConfigureRoute: ConfigureRoute,
   DashboardRoute: DashboardRoute,
   ProcessRoute: ProcessRoute,
   ReportRoute: ReportRoute,

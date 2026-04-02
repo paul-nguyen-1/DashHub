@@ -1,7 +1,5 @@
 const BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
-// ---- Types ----
-
 export interface UploadResponse {
   file_id: string;
   filename: string;
@@ -16,16 +14,60 @@ export interface Column {
   null_count: number;
 }
 
+export interface SuggestedDashboard {
+  id: string;
+  label: string;
+  description: string;
+}
+
 export interface ProcessResponse {
   file_id: string;
   filename: string;
   row_count: number;
   column_count: number;
   columns: Column[];
+  suggested_dashboard: SuggestedDashboard;
+}
+
+export interface KpiStat {
+  sum: number;
+  mean: number;
+  label: string;
+}
+
+export interface DashboardData {
+  columns: {
+    date: string | null;
+    numeric: string[];
+    dimensions: string[];
+  };
+  kpis: Record<string, KpiStat>;
+  time_series: Record<string, string | number>[];
+  breakdowns: Record<string, Record<string, string | number>[]>;
+}
+
+export interface ReportSection {
+  title: string;
+  type: 'paragraph' | 'bullets';
+  content?: string;
+  items?: string[];
 }
 
 export interface ReportResponse {
-  report: string;
+  sections: ReportSection[];
+}
+
+export interface InsightCard {
+  id: string
+  type: 'anomaly' | 'insight' | 'suggestion'
+  title: string
+  body: string
+  action?: string | null
+}
+
+export interface InsightsResponse {
+  insights: InsightCard[]
+  quick_questions: string[]
 }
 
 export interface ChatMessage {
@@ -37,8 +79,6 @@ export interface ChatResponse {
   reply: string;
 }
 
-// ---- Client ----
-
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, init);
   if (!res.ok) {
@@ -49,24 +89,32 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  /** Upload a CSV or TSV file. Returns a file_id for subsequent calls. */
   upload(file: File): Promise<UploadResponse> {
     const form = new FormData();
     form.append("file", file);
     return request<UploadResponse>("/upload", { method: "POST", body: form });
   },
 
-  /** Detect column types and sample values for an uploaded file. */
   process(fileId: string): Promise<ProcessResponse> {
     return request<ProcessResponse>(`/process/${fileId}`);
   },
 
-  /** Generate an AI executive report for an uploaded file. */
+  getDashboard(fileId: string): Promise<DashboardData> {
+    return request<DashboardData>(`/dashboard/${fileId}`);
+  },
+
   generateReport(fileId: string): Promise<ReportResponse> {
     return request<ReportResponse>(`/ai/report/${fileId}`, { method: "POST" });
   },
 
-  /** Send a chat message about an uploaded file. */
+  getInsights(fileId: string): Promise<InsightsResponse> {
+    return request<InsightsResponse>(`/ai/insights/${fileId}`, { method: "POST" });
+  },
+
+  investigateAnomalies(fileId: string): Promise<ReportResponse> {
+    return request<ReportResponse>(`/ai/investigate/${fileId}`, { method: "POST" });
+  },
+
   chat(fileId: string, messages: ChatMessage[]): Promise<ChatResponse> {
     return request<ChatResponse>("/ai/chat", {
       method: "POST",

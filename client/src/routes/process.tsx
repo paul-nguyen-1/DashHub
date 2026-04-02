@@ -60,71 +60,6 @@ const TYPE_STYLES: Record<ColumnType, string> = {
   boolean: 'bg-amber-50 text-amber-700 border border-amber-200',
 }
 
-const INITIAL_COLUMNS: DetectedColumn[] = [
-  {
-    name: 'sale_date',
-    type: 'date',
-    role: 'time_axis',
-    samples: ['2025-07-01', '2025-07-02', '2025-07-03'],
-    nullable: false,
-  },
-  {
-    name: 'revenue',
-    type: 'number',
-    role: 'primary_metric',
-    samples: ['4,200', '3,870', '5,100'],
-    nullable: false,
-  },
-  {
-    name: 'units_sold',
-    type: 'number',
-    role: 'metric',
-    samples: ['120', '98', '143'],
-    nullable: false,
-  },
-  {
-    name: 'region',
-    type: 'text',
-    role: 'dimension',
-    samples: ['North', 'South', 'West'],
-    nullable: false,
-  },
-  {
-    name: 'product',
-    type: 'text',
-    role: 'dimension',
-    samples: ['Widget A', 'Widget B', 'Widget C'],
-    nullable: false,
-  },
-  {
-    name: 'rep_name',
-    type: 'text',
-    role: 'dimension',
-    samples: ['J. Smith', 'R. Patel', 'M. Lee'],
-    nullable: false,
-  },
-  {
-    name: 'deal_size',
-    type: 'number',
-    role: 'metric',
-    samples: ['67.30', '42.00', '89.50'],
-    nullable: false,
-  },
-  {
-    name: 'status',
-    type: 'text',
-    role: 'filter',
-    samples: ['Closed', 'Open', 'Lost'],
-    nullable: true,
-  },
-  {
-    name: 'notes',
-    type: 'text',
-    role: 'ignore',
-    samples: ['Follow up', '—', 'Urgent'],
-    nullable: true,
-  },
-]
 
 function assignDefaultRoles(cols: Column[]): DetectedColumn[] {
   let hasTimeAxis = false
@@ -336,7 +271,7 @@ function ColumnTable({
                 Type
               </th>
               <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-(--sea-ink-soft) sm:table-cell">
-                Sample values
+                Sample value
               </th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-(--sea-ink-soft)">
                 Assigned role
@@ -366,7 +301,7 @@ function ColumnTable({
                 </td>
                 <td className="hidden px-4 py-3 sm:table-cell">
                   <span className="font-mono text-xs text-(--sea-ink-soft)">
-                    {col.samples.join(' · ')}
+                    {col.samples.slice(0, 1).join(' · ')}
                   </span>
                 </td>
                 <td className="px-4 py-3">
@@ -395,17 +330,24 @@ function ProcessPage() {
   const navigate = useNavigate()
   const { file, file_id } = Route.useSearch()
 
-  const [columns, setColumns] = useState<DetectedColumn[]>(INITIAL_COLUMNS)
+  const [columns, setColumns] = useState<DetectedColumn[]>([])
+  const [apiColumns, setApiColumns] = useState<DetectedColumn[]>([])
+  const [suggestedDashboard, setSuggestedDashboard] = useState<string | undefined>(undefined)
   const [fileInfo, setFileInfo] = useState<{ rows: number; cols: number } | null>(null)
+  const [apiError, setApiError] = useState<string | null>(null)
   const [analysisReady, setAnalysisReady] = useState(false)
 
-  // Fetch real columns when a file_id is available
   useEffect(() => {
     if (!file_id) return
-    api.process(file_id).then((res) => {
-      setColumns(assignDefaultRoles(res.columns))
-      setFileInfo({ rows: res.row_count, cols: res.column_count })
-    })
+    api.process(file_id)
+      .then((res) => {
+        const mapped = assignDefaultRoles(res.columns)
+        setColumns(mapped)
+        setApiColumns(mapped)
+        setFileInfo({ rows: res.row_count, cols: res.column_count })
+        setSuggestedDashboard(res.suggested_dashboard.id)
+      })
+      .catch((err) => setApiError(err.message ?? 'Failed to process file'))
   }, [file_id])
 
   const handleComplete = useCallback(() => {
@@ -430,7 +372,7 @@ function ProcessPage() {
       <section className="island-shell rise-in relative overflow-hidden rounded-4xl px-6 py-10 sm:px-10 sm:py-12">
         <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(37,99,235,0.14),transparent_66%)]" />
 
-        <p className="island-kicker mb-3">Step 2 of 4</p>
+        <p className="island-kicker mb-3">Step 2 of 3</p>
         <h1 className="display-title mb-3 text-3xl font-bold leading-tight tracking-tight text-(--sea-ink) sm:text-4xl">
           Analyzing your file
         </h1>
@@ -485,6 +427,13 @@ function ProcessPage() {
             </div>
           </div>
 
+          {apiError && (
+            <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <span className="mt-0.5 shrink-0">⚠</span>
+              <p>{apiError}</p>
+            </div>
+          )}
+
           {showColumns && (
             <div
               className="flex flex-col gap-4 rise-in"
@@ -503,7 +452,7 @@ function ProcessPage() {
                   </h2>
                   <button
                     type="button"
-                    onClick={() => setColumns(INITIAL_COLUMNS)}
+                    onClick={() => setColumns(apiColumns)}
                     className="text-xs text-(--sea-ink-soft) underline-offset-2 hover:underline"
                   >
                     Reset to AI defaults
@@ -577,7 +526,7 @@ function ProcessPage() {
               ].map(({ label, value, color }) => (
                 <div
                   key={label}
-                  className="flex flex-col gap-0.5 rounded-lg px-3 py-2.5 odd:bg-[rgba(23,58,64,0.03)]"
+                  className="flex flex-col gap-0.5 rounded-lg px-2.5 py-2.5 odd:bg-[rgba(23,58,64,0.03)]"
                 >
                   <span className="text-xs font-semibold uppercase tracking-wide text-(--sea-ink-soft)">
                     {label}
@@ -622,7 +571,7 @@ function ProcessPage() {
             <button
               type="button"
               disabled={!analysisReady}
-              onClick={() => navigate({ to: '/configure', search: { file, file_id } })}
+              onClick={() => navigate({ to: '/dashboard', search: { file, file_id, dashboard_type: suggestedDashboard } })}
               className={[
                 'w-full rounded-2xl py-3.5 text-sm font-semibold transition',
                 analysisReady
@@ -630,7 +579,7 @@ function ProcessPage() {
                   : 'cursor-not-allowed bg-[rgba(23,58,64,0.07)] text-(--sea-ink-soft)',
               ].join(' ')}
             >
-              {analysisReady ? 'Confirm & configure dashboard →' : 'Analyzing…'}
+              {analysisReady ? 'Build my dashboard →' : 'Analyzing…'}
             </button>
             <Link
               to="/upload"

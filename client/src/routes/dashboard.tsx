@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useState, useRef, useEffect } from 'react'
+import { api, type DashboardData, type InsightCard } from '@/lib/api'
 import {
   BarChart,
   Bar,
@@ -17,6 +18,7 @@ export const Route = createFileRoute('/dashboard')({
   validateSearch: (s: Record<string, unknown>) => ({
     file: s.file ? String(s.file) : undefined,
     file_id: s.file_id ? String(s.file_id) : undefined,
+    dashboard_type: s.dashboard_type ? String(s.dashboard_type) : undefined,
   }),
   component: DashboardPage,
 })
@@ -26,97 +28,15 @@ interface Message {
   content: string
 }
 
-interface InsightCard {
-  id: string
-  type: 'anomaly' | 'insight' | 'suggestion'
-  title: string
-  body: string
-  action?: string
-}
 
-const MONTHLY_REVENUE = [
-  { month: 'Jan', revenue: 62400 },
-  { month: 'Feb', revenue: 71200 },
-  { month: 'Mar', revenue: 68900 },
-  { month: 'Apr', revenue: 84100 },
-  { month: 'May', revenue: 79600 },
-  { month: 'Jun', revenue: 93800 },
-  { month: 'Jul', revenue: 112400 },
-  { month: 'Aug', revenue: 141200 },
-  { month: 'Sep', revenue: 62900 },
+
+const FALLBACK_QUICK_QUESTIONS = [
+  'What are the key trends?',
+  'Which segment performed best?',
+  'Any anomalies in the data?',
+  'What do you recommend?',
 ]
 
-const REGION_REVENUE = [
-  { region: 'North', revenue: 412000 },
-  { region: 'West', revenue: 328000 },
-  { region: 'South', revenue: 261000 },
-  { region: 'East', revenue: 192000 },
-  { region: 'Central', revenue: 47000 },
-]
-
-const PRODUCT_REVENUE = [
-  { product: 'Widget A', revenue: 380000 },
-  { product: 'Widget B', revenue: 295000 },
-  { product: 'Widget C', revenue: 190000 },
-  { product: 'Widget D', revenue: 115000 },
-]
-
-const DEAL_SIZE_TREND = [
-  { month: 'Jan', avg: 68.2 },
-  { month: 'Feb', avg: 68.8 },
-  { month: 'Mar', avg: 69.1 },
-  { month: 'Apr', avg: 68.5 },
-  { month: 'May', avg: 69.4 },
-  { month: 'Jun', avg: 68.9 },
-  { month: 'Jul', avg: 68.1 },
-  { month: 'Aug', avg: 67.8 },
-  { month: 'Sep', avg: 67.3 },
-]
-
-const UNITS_BY_MONTH = [
-  { month: 'Jan', units: 916 },
-  { month: 'Feb', units: 1048 },
-  { month: 'Mar', units: 1012 },
-  { month: 'Apr', units: 1238 },
-  { month: 'May', units: 1170 },
-  { month: 'Jun', units: 1380 },
-  { month: 'Jul', units: 1654 },
-  { month: 'Aug', units: 2078 },
-  { month: 'Sep', units: 932 },
-]
-
-const INITIAL_INSIGHTS: InsightCard[] = [
-  {
-    id: 'anomaly-sep',
-    type: 'anomaly',
-    title: 'September revenue collapsed',
-    body: 'North region revenue dropped 46% vs August. 3 reps logged zero sales after Sep 15.',
-    action: 'Generate report',
-  },
-  {
-    id: 'insight-west',
-    type: 'insight',
-    title: 'West region growing fast',
-    body: 'West grew 18% QoQ — your fastest expanding market this quarter.',
-    action: 'Explore',
-  },
-  {
-    id: 'suggestion-leaderboard',
-    type: 'suggestion',
-    title: 'Add a rep leaderboard?',
-    body: 'I see 24 unique values in rep_name. A leaderboard chart would surface your top performers.',
-    action: 'Add chart',
-  },
-]
-
-const QUICK_QUESTIONS = [
-  'Why did Sep drop?',
-  'Top rep by revenue',
-  'Forecast Q4',
-  'Compare regions',
-]
-
-const ANOMALY_MONTH = 'Sep'
 
 function fmt(n: number) {
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`
@@ -255,21 +175,25 @@ function InsightCardView({
 }
 
 function AiPanel({
+  fileId,
   insights,
+  quickQuestions,
   onDismissInsight,
   onInsightAction,
 }: {
+  fileId?: string
   insights: InsightCard[]
+  quickQuestions: string[]
   onDismissInsight: (id: string) => void
   onInsightAction: (card: InsightCard) => void
 }) {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'ai',
-      content:
-        "✦ I analyzed **2,418 rows** and built this dashboard. Here's what stood out:",
+      content: '✦ Your dashboard is ready. Ask me anything about your data.',
     },
   ])
+  const [history, setHistory] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
   const [input, setInput] = useState('')
   const [thinking, setThinking] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -278,35 +202,36 @@ function AiPanel({
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, thinking])
 
-  const AI_RESPONSES: Record<string, string> = {
-    'why did sep drop?':
-      'North region drove ~91% of the drop. J. Smith, R. Patel, and M. Lee logged zero sales after Sep 15 — all three were active all of July and August. Most likely a data entry gap or personnel change.',
-    'top rep by revenue':
-      'Based on your data, J. Smith (North) led Q3 with the highest revenue per entry in Jul–Aug. R. Patel (West) was close behind and showed consistent growth. Both are significantly above the team average.',
-    'forecast q4':
-      "Based on the Jul–Aug trajectory (+26% MoM), Q4 could hit ~$1.6M if North recovers. Without North, West and South trends suggest ~$1.1M. I'd recommend resolving the North gap before forecasting.",
-    'compare regions':
-      'West is your fastest grower (+18% QoQ). North has the highest absolute revenue but the Sep anomaly brought it down sharply. South is steady. Central and East are underweighted — both have room to scale.',
-  }
-
-  const handleSend = async () => {
-    const text = input.trim()
+  const handleSend = async (text = input.trim()) => {
     if (!text) return
+    const userMsg = { role: 'user' as const, content: text }
     setMessages((prev) => [...prev, { role: 'user', content: text }])
     setInput('')
     setThinking(true)
-    await new Promise((r) => setTimeout(r, 900))
-    setThinking(false)
-    const key = text.toLowerCase()
-    const answer =
-      AI_RESPONSES[key] ??
-      `Good question about "${text}". Based on your CSV data, I'd look at the regional breakdown and the Sep 15 cutoff as the most relevant signal. Want me to generate a focused report on this?`
-    setMessages((prev) => [...prev, { role: 'ai', content: answer }])
+
+    try {
+      if (fileId) {
+        const nextHistory = [...history, userMsg]
+        const { reply } = await api.chat(fileId, nextHistory)
+        setHistory([...nextHistory, { role: 'assistant', content: reply }])
+        setMessages((prev) => [...prev, { role: 'ai', content: reply }])
+      } else {
+        setMessages((prev) => [
+          ...prev,
+          { role: 'ai', content: 'No file loaded — upload a CSV to ask questions.' },
+        ])
+      }
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        { role: 'ai', content: 'Something went wrong. Please try again.' },
+      ])
+    } finally {
+      setThinking(false)
+    }
   }
 
-  const handleQuickQuestion = (q: string) => {
-    setInput(q)
-  }
+  const handleQuickQuestion = (q: string) => handleSend(q)
 
   return (
     <div className="flex w-64 shrink-0 flex-col border-l border-[rgba(23,58,64,0.1)] bg-white/80">
@@ -366,7 +291,7 @@ function AiPanel({
               Quick questions:
             </p>
             <div className="flex flex-wrap gap-1.5">
-              {QUICK_QUESTIONS.map((q) => (
+              {quickQuestions.map((q) => (
                 <button
                   key={q}
                   type="button"
@@ -394,7 +319,7 @@ function AiPanel({
         />
         <button
           type="button"
-          onClick={handleSend}
+          onClick={() => handleSend()}
           disabled={!input.trim() || thinking}
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-(--lagoon-deep) text-white transition hover:opacity-90 disabled:opacity-40"
         >
@@ -407,21 +332,51 @@ function AiPanel({
 
 function DashboardPage() {
   const { file, file_id } = Route.useSearch()
-  const [insights, setInsights] = useState<InsightCard[]>(INITIAL_INSIGHTS)
-  const [regionFilter, setRegionFilter] = useState('All regions')
-  const [dateFilter, setDateFilter] = useState('Jul–Sep 2025')
-  const [showBanner, setShowBanner] = useState(true)
+  const [insights, setInsights] = useState<InsightCard[]>([])
+  const [quickQuestions, setQuickQuestions] = useState<string[]>(FALLBACK_QUICK_QUESTIONS)
+  const [showBanner, setShowBanner] = useState(!!file_id)
+  const [data, setData] = useState<DashboardData | null>(null)
+
+  useEffect(() => {
+    if (!file_id) return
+    api.getDashboard(file_id).then(setData).catch(console.error)
+    api.getInsights(file_id)
+      .then(({ insights, quick_questions }) => {
+        setInsights(insights)
+        setQuickQuestions(quick_questions)
+      })
+      .catch(console.error)
+  }, [file_id])
 
   const reportSearch = { file, file_id }
+
+  const numCols = data?.columns.numeric ?? []
+  const dimCols = data?.columns.dimensions ?? []
+  const primaryCol = numCols[0]
+  const secondaryCol = numCols[1]
+  const tertiaryCol = numCols[numCols.length - 1]
+  const dim0 = dimCols[0]
+  const dim1 = dimCols[1]
+
+  const anomalyMonth = primaryCol && data?.time_series.length
+    ? [...data.time_series].sort(
+        (a, b) => (a[primaryCol] as number) - (b[primaryCol] as number),
+      )[0].month as string
+    : ''
 
   const dismissInsight = (id: string) =>
     setInsights((prev) => prev.filter((c) => c.id !== id))
 
   const handleInsightAction = (card: InsightCard) => {
     if (card.id === 'anomaly-sep') {
-      window.location.href = `/report?file=${file ?? ''}&file_id=${file_id ?? ''}`
+      window.location.href = `/report?file=${file ?? ''}&file_id=${file_id ?? ''}&mode=investigate`
     }
   }
+
+  const dim0Values = dim0
+    ? ['All', ...(data?.breakdowns[dim0] ?? []).map((r) => String(r[dim0]))]
+    : ['All']
+  const [dimFilter, setDimFilter] = useState('All')
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-(--page-bg,#f2f4f0)">
@@ -440,37 +395,21 @@ function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <select
-            value={dateFilter}
-            onChange={(e) => setDateFilter(e.target.value)}
-            className="rounded-xl border border-[rgba(23,58,64,0.14)] bg-white px-3 py-1.5 text-xs text-(--sea-ink) focus:outline-none focus:ring-1 focus:ring-(--lagoon-deep)"
-          >
-            {[
-              'Jul–Sep 2025',
-              'Jul 2025',
-              'Aug 2025',
-              'Sep 2025',
-              'All data',
-            ].map((o) => (
-              <option key={o}>{o}</option>
-            ))}
-          </select>
-
-          <select
-            value={regionFilter}
-            onChange={(e) => setRegionFilter(e.target.value)}
-            className="rounded-xl border border-[rgba(23,58,64,0.14)] bg-white px-3 py-1.5 text-xs text-(--sea-ink) focus:outline-none focus:ring-1 focus:ring-(--lagoon-deep)"
-          >
-            {['All regions', 'North', 'West', 'South', 'East', 'Central'].map(
-              (o) => (
+          {dim0 && dim0Values.length > 1 && (
+            <select
+              value={dimFilter}
+              onChange={(e) => setDimFilter(e.target.value)}
+              className="rounded-xl border border-[rgba(23,58,64,0.14)] bg-white px-3 py-1.5 text-xs text-(--sea-ink) focus:outline-none focus:ring-1 focus:ring-(--lagoon-deep)"
+            >
+              {dim0Values.map((o) => (
                 <option key={o}>{o}</option>
-              ),
-            )}
-          </select>
+              ))}
+            </select>
+          )}
 
           <Link
             to="/report"
-            search={reportSearch}
+            search={{ ...reportSearch, mode: 'report' }}
             className="rounded-xl bg-(--lagoon-deep) px-3 py-1.5 text-xs font-semibold text-white! no-underline transition hover:opacity-90"
           >
             Generate report →
@@ -484,16 +423,15 @@ function DashboardPage() {
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div className="flex flex-1 flex-col overflow-y-auto p-4 gap-3">
-          {showBanner && (
+          {showBanner && anomalyMonth && (
             <div className="flex items-center justify-between gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
               <p className="text-sm font-medium text-red-700">
-                ⚠ September revenue dropped 46% vs August — North region
-                accounts for 80% of the shortfall
+                ⚠ {anomalyMonth} shows the lowest {primaryCol ?? 'metric'} — possible anomaly detected
               </p>
               <div className="flex shrink-0 items-center gap-2">
                 <Link
                   to="/report"
-            search={reportSearch}
+                  search={{ ...reportSearch, mode: 'investigate' }}
                   className="rounded-xl bg-red-600 px-3 py-1.5 text-xs font-semibold text-white no-underline transition hover:bg-red-700"
                 >
                   Investigate →
@@ -510,240 +448,160 @@ function DashboardPage() {
           )}
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <KpiCard
-              label="Total revenue"
-              value="$1.24M"
-              delta="↑ 9.2% vs Q2"
-              up={true}
-            />
-            <KpiCard
-              label="Units sold"
-              value="18,430"
-              delta="↑ 6.7%"
-              up={true}
-            />
-            <KpiCard
-              label="Avg deal size"
-              value="$67.30"
-              delta="↓ 2.4%"
-              up={false}
-            />
-            <KpiCard
-              label="Active reps"
-              value="24"
-              delta="No change"
-              up={null}
-            />
+            {numCols.slice(0, 4).map((col, i) => {
+              const stat = data?.kpis[col]
+              const value = stat
+                ? i === 0
+                  ? fmt(stat.sum)
+                  : stat.sum % 1 === 0
+                    ? stat.sum.toLocaleString()
+                    : `$${stat.mean.toFixed(2)}`
+                : '—'
+              return (
+                <KpiCard
+                  key={col}
+                  label={col.replace(/_/g, ' ')}
+                  value={value}
+                  delta=""
+                  up={null}
+                />
+              )
+            })}
           </div>
 
           <div className="grid gap-3 lg:grid-cols-[3fr_2fr]">
-            <div className="island-shell rounded-2xl p-4">
-              <p className="mb-3 text-xs font-semibold text-(--sea-ink-soft)">
-                Monthly revenue
-                <span className="ml-2 font-normal opacity-60">
-                  — Sep anomaly highlighted
-                </span>
-              </p>
-              <ResponsiveContainer width="100%" height={160}>
-                <BarChart
-                  data={MONTHLY_REVENUE}
-                  barSize={22}
-                  margin={{ top: 4, right: 4, left: -20, bottom: 0 }}
-                >
-                  <CartesianGrid
-                    vertical={false}
-                    stroke="rgba(23,58,64,0.06)"
-                  />
-                  <XAxis
-                    dataKey="month"
-                    tick={{ fontSize: 11, fill: '#8a9a98' }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tickFormatter={(v) => `$${(v / 1000).toFixed(0)}K`}
-                    tick={{ fontSize: 10, fill: '#8a9a98' }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <Tooltip
-                    content={<ChartTooltip />}
-                    cursor={{ fill: 'rgba(23,58,64,0.04)' }}
-                  />
-                  <Bar dataKey="revenue" radius={[4, 4, 0, 0]}>
-                    {MONTHLY_REVENUE.map((entry) => (
-                      <Cell
-                        key={entry.month}
-                        fill={
-                          entry.month === ANOMALY_MONTH ? '#fca5a5' : '#2a8f97'
-                        }
-                        stroke={
-                          entry.month === ANOMALY_MONTH ? '#f87171' : 'none'
-                        }
-                        strokeWidth={entry.month === ANOMALY_MONTH ? 1 : 0}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-            <div className="island-shell rounded-2xl p-4">
-              <p className="mb-3 text-xs font-semibold text-(--sea-ink-soft)">
-                Revenue by region
-              </p>
-              <div className="flex flex-col gap-2.5 pt-1">
-                {REGION_REVENUE.map(({ region, revenue }) => {
-                  const pct = Math.round(
-                    (revenue / REGION_REVENUE[0].revenue) * 100,
-                  )
-                  return (
-                    <div key={region} className="flex items-center gap-2.5">
-                      <span className="w-14 shrink-0 text-xs text-(--sea-ink-soft)">
-                        {region}
-                      </span>
-                      <div
-                        className="flex-1 overflow-hidden rounded-full bg-[rgba(23,58,64,0.07)]"
-                        style={{ height: 8 }}
-                      >
-                        <div
-                          className="h-full rounded-full bg-(--lagoon-deep) transition-all duration-500"
-                          style={{
-                            width: `${pct}%`,
-                            opacity:
-                              region === 'North' ? 1 : 0.55 + pct * 0.004,
-                          }}
+            {primaryCol && (
+              <div className="island-shell rounded-2xl p-4">
+                <p className="mb-3 text-xs font-semibold text-(--sea-ink-soft)">
+                  {primaryCol.replace(/_/g, ' ')} by month
+                  {anomalyMonth && (
+                    <span className="ml-2 font-normal opacity-60">
+                      — {anomalyMonth} anomaly highlighted
+                    </span>
+                  )}
+                </p>
+                <ResponsiveContainer width="100%" height={160}>
+                  <BarChart
+                    data={data?.time_series ?? []}
+                    barSize={22}
+                    margin={{ top: 4, right: 4, left: -20, bottom: 0 }}
+                  >
+                    <CartesianGrid vertical={false} stroke="rgba(23,58,64,0.06)" />
+                    <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#8a9a98' }} axisLine={false} tickLine={false} />
+                    <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} tick={{ fontSize: 10, fill: '#8a9a98' }} axisLine={false} tickLine={false} />
+                    <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(23,58,64,0.04)' }} />
+                    <Bar dataKey={primaryCol} radius={[4, 4, 0, 0]}>
+                      {(data?.time_series ?? []).map((entry) => (
+                        <Cell
+                          key={String(entry.month)}
+                          fill={entry.month === anomalyMonth ? '#fca5a5' : '#2a8f97'}
+                          stroke={entry.month === anomalyMonth ? '#f87171' : 'none'}
+                          strokeWidth={entry.month === anomalyMonth ? 1 : 0}
                         />
-                      </div>
-                      <span className="w-12 shrink-0 text-right text-xs text-(--sea-ink-soft)">
-                        {fmt(revenue)}
-                      </span>
-                    </div>
-                  )
-                })}
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
-            </div>
+            )}
+
+            {dim0 && (
+              <div className="island-shell rounded-2xl p-4">
+                <p className="mb-3 text-xs font-semibold text-(--sea-ink-soft)">
+                  {primaryCol?.replace(/_/g, ' ')} by {dim0.replace(/_/g, ' ')}
+                </p>
+                <div className="flex flex-col gap-2.5 pt-1">
+                  {(data?.breakdowns[dim0] ?? []).map((row) => {
+                    const label = String(row[dim0])
+                    const val = row[primaryCol] as number
+                    const max = (data?.breakdowns[dim0]?.[0]?.[primaryCol] as number) ?? 1
+                    const pct = Math.round((val / max) * 100)
+                    return (
+                      <div key={label} className="flex items-center gap-2.5">
+                        <span className="w-14 shrink-0 truncate text-xs text-(--sea-ink-soft)">{label}</span>
+                        <div className="flex-1 overflow-hidden rounded-full bg-[rgba(23,58,64,0.07)]" style={{ height: 8 }}>
+                          <div className="h-full rounded-full bg-(--lagoon-deep) transition-all duration-500" style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="w-12 shrink-0 text-right text-xs text-(--sea-ink-soft)">{fmt(val)}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="island-shell rounded-2xl p-4">
-              <p className="mb-3 text-xs font-semibold text-(--sea-ink-soft)">
-                Top products
-              </p>
-              <div className="flex flex-col gap-2.5">
-                {PRODUCT_REVENUE.map(({ product, revenue }) => {
-                  const pct = Math.round(
-                    (revenue / PRODUCT_REVENUE[0].revenue) * 100,
-                  )
-                  return (
-                    <div key={product} className="flex items-center gap-2">
-                      <span className="w-16 shrink-0 text-xs text-(--sea-ink-soft)">
-                        {product}
-                      </span>
-                      <div
-                        className="flex-1 overflow-hidden rounded-full bg-[rgba(23,58,64,0.07)]"
-                        style={{ height: 7 }}
-                      >
-                        <div
-                          className="h-full rounded-full transition-all duration-500"
-                          style={{ width: `${pct}%`, background: '#2a8f97' }}
-                        />
+            {dim1 && primaryCol && (
+              <div className="island-shell rounded-2xl p-4">
+                <p className="mb-3 text-xs font-semibold text-(--sea-ink-soft)">
+                  Top {dim1.replace(/_/g, ' ')}
+                </p>
+                <div className="flex flex-col gap-2.5">
+                  {(data?.breakdowns[dim1] ?? []).map((row) => {
+                    const label = String(row[dim1])
+                    const val = row[primaryCol] as number
+                    const max = (data?.breakdowns[dim1]?.[0]?.[primaryCol] as number) ?? 1
+                    const pct = Math.round((val / max) * 100)
+                    return (
+                      <div key={label} className="flex items-center gap-2">
+                        <span className="w-16 shrink-0 truncate text-xs text-(--sea-ink-soft)">{label}</span>
+                        <div className="flex-1 overflow-hidden rounded-full bg-[rgba(23,58,64,0.07)]" style={{ height: 7 }}>
+                          <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: '#2a8f97' }} />
+                        </div>
+                        <span className="w-12 shrink-0 text-right text-xs text-(--sea-ink-soft)">{fmt(val)}</span>
                       </div>
-                      <span className="w-12 shrink-0 text-right text-xs text-(--sea-ink-soft)">
-                        {fmt(revenue)}
-                      </span>
-                    </div>
-                  )
-                })}
+                    )
+                  })}
+                </div>
               </div>
-            </div>
+            )}
 
-            <div className="island-shell rounded-2xl p-4">
-              <p className="mb-3 text-xs font-semibold text-(--sea-ink-soft)">
-                Avg deal size
-                <span className="ml-2 font-normal text-red-500">
-                  ↓ trending down
-                </span>
-              </p>
-              <ResponsiveContainer width="100%" height={100}>
-                <LineChart
-                  data={DEAL_SIZE_TREND}
-                  margin={{ top: 4, right: 4, left: -28, bottom: 0 }}
-                >
-                  <CartesianGrid
-                    vertical={false}
-                    stroke="rgba(23,58,64,0.06)"
-                  />
-                  <XAxis
-                    dataKey="month"
-                    tick={{ fontSize: 10, fill: '#8a9a98' }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    domain={[66, 70]}
-                    tick={{ fontSize: 10, fill: '#8a9a98' }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <Tooltip content={<ChartTooltip prefix="$" />} />
-                  <Line
-                    type="monotone"
-                    dataKey="avg"
-                    stroke="#ef4444"
-                    strokeWidth={2}
-                    dot={false}
-                    activeDot={{ r: 4, fill: '#ef4444' }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+            {tertiaryCol && tertiaryCol !== primaryCol && (
+              <div className="island-shell rounded-2xl p-4">
+                <p className="mb-3 text-xs font-semibold text-(--sea-ink-soft)">
+                  Avg {tertiaryCol.replace(/_/g, ' ')} trend
+                </p>
+                <ResponsiveContainer width="100%" height={100}>
+                  <LineChart data={data?.time_series ?? []} margin={{ top: 4, right: 4, left: -28, bottom: 0 }}>
+                    <CartesianGrid vertical={false} stroke="rgba(23,58,64,0.06)" />
+                    <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#8a9a98' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: '#8a9a98' }} axisLine={false} tickLine={false} />
+                    <Tooltip content={<ChartTooltip prefix="" />} />
+                    <Line type="monotone" dataKey={tertiaryCol} stroke="#ef4444" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: '#ef4444' }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
 
-            <div className="island-shell rounded-2xl p-4">
-              <p className="mb-3 text-xs font-semibold text-(--sea-ink-soft)">
-                Units sold by month
-              </p>
-              <ResponsiveContainer width="100%" height={100}>
-                <BarChart
-                  data={UNITS_BY_MONTH}
-                  barSize={14}
-                  margin={{ top: 4, right: 4, left: -28, bottom: 0 }}
-                >
-                  <CartesianGrid
-                    vertical={false}
-                    stroke="rgba(23,58,64,0.06)"
-                  />
-                  <XAxis
-                    dataKey="month"
-                    tick={{ fontSize: 10, fill: '#8a9a98' }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tickFormatter={fmtShort}
-                    tick={{ fontSize: 10, fill: '#8a9a98' }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <Tooltip content={<ChartTooltip prefix="" />} />
-                  <Bar dataKey="units" radius={[3, 3, 0, 0]}>
-                    {UNITS_BY_MONTH.map((entry) => (
-                      <Cell
-                        key={entry.month}
-                        fill={
-                          entry.month === ANOMALY_MONTH ? '#fca5a5' : '#2a8f97'
-                        }
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            {secondaryCol && secondaryCol !== tertiaryCol && (
+              <div className="island-shell rounded-2xl p-4">
+                <p className="mb-3 text-xs font-semibold text-(--sea-ink-soft)">
+                  {secondaryCol.replace(/_/g, ' ')} by month
+                </p>
+                <ResponsiveContainer width="100%" height={100}>
+                  <BarChart data={data?.time_series ?? []} barSize={14} margin={{ top: 4, right: 4, left: -28, bottom: 0 }}>
+                    <CartesianGrid vertical={false} stroke="rgba(23,58,64,0.06)" />
+                    <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#8a9a98' }} axisLine={false} tickLine={false} />
+                    <YAxis tickFormatter={fmtShort} tick={{ fontSize: 10, fill: '#8a9a98' }} axisLine={false} tickLine={false} />
+                    <Tooltip content={<ChartTooltip prefix="" />} />
+                    <Bar dataKey={secondaryCol} radius={[3, 3, 0, 0]}>
+                      {(data?.time_series ?? []).map((entry) => (
+                        <Cell
+                          key={String(entry.month)}
+                          fill={entry.month === anomalyMonth ? '#fca5a5' : '#2a8f97'}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2 px-1 pb-1">
             <span className="text-xs text-(--sea-ink-soft) opacity-60">
-              Source: Sales_Q3_2025.csv · 131 rows · Last imported just now
+              Source: {file ?? 'uploaded file'}
             </span>
             <Link
               to="/upload"
@@ -755,7 +613,9 @@ function DashboardPage() {
         </div>
 
         <AiPanel
+          fileId={file_id}
           insights={insights}
+          quickQuestions={quickQuestions}
           onDismissInsight={dismissInsight}
           onInsightAction={handleInsightAction}
         />
