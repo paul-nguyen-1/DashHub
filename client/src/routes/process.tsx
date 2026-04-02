@@ -547,7 +547,7 @@ function ProcessPage() {
               style={{ animationDelay: '0ms' }}
             >
               <p className="island-kicker mb-3">Suggested dashboard</p>
-              <div className="rounded-xl border border-[rgba(37,99,235,0.25)] bg-[rgba(37,99,235,0.05)] px-4 py-3.5">
+              <div className="rounded-xl border border-[rgba(37,99,235,0.25)] bg-[rgba(37,99,235,0.05)] px-3 py-3.5">
                 <div className="mb-1 flex items-center justify-between">
                   <span className="text-sm font-semibold text-(--sea-ink)">
                     Sales Performance
